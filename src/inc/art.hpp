@@ -3,8 +3,11 @@
 
 #include <limits>
 #include <numbers>
+#include <random>
+#include <concepts>
 
 template<typename T>
+    requires std::floating_point<T>
 class artT_t final
 {
 public:
@@ -21,7 +24,15 @@ public:
     //
     static T degrees_to_radians(T degrees)
     {
-        return degrees * pi / 180.0;
+        return degrees * pi / 180;
+    }
+
+    // Get a random value from [0, 1)
+    static T rnd_val()
+    {
+        static std::uniform_real_distribution<T> distribution{ 0, 1 };
+        static std::mt19937 generator;
+        return distribution(generator);
     }
 };
 

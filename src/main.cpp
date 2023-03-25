@@ -5,10 +5,12 @@
 #include <cmath>
 #include <vector>
 #include <memory>
+#include <algorithm>
 
 #include <art.hpp>
 #include <vec3.hpp>
 #include <ray.hpp>
+#include <camera.hpp>
 #include <hittable.hpp>
 #include <shapes.hpp>
 
@@ -16,10 +18,11 @@ namespace
 {
     // Type aliases
     using art_t = artT_t<float>;
-    using vec3_t = vecT3_t<art_t::elem_t>;
-    using point3_t = pointT3_t<vec3_t::elem_t>;
-    using color_t = colorT_t<vec3_t::elem_t>;
+    using vec3_t = vec3T_t<art_t::elem_t>;
+    using point3_t = point3T_t<vec3_t::elem_t>;
+    using color_t = vec3_t;
     using ray_t = rayT_t<vec3_t::elem_t>;
+    using camera_t = cameraT_t<art_t::elem_t>;
     using sphere_t = sphereT_t<vec3_t::elem_t>;
     using hittable_list_t = hittableT_list_t<vec3_t::elem_t>;
 
@@ -30,17 +33,25 @@ namespace
         uint8_t b;
     };
 
-    color_t const g_white{ 1.0f, 1.0f, 1.0f }; // White
+    color_t const g_white{ 1, 1, 1 }; // White
     color_t const g_gradient_start = g_white;
-    color_t const g_gradient_end{ 0.5f, 0.7f, 1.0f }; // Light blue
+    color_t const g_gradient_end{ 0.5f, 0.7f, 1 }; // Light blue
 
-    void write_pixel(color_t pixel_color, std::vector<pixel_t>& data)
+    pixel_t create_pixel(color_t pixel_color, int32_t samples)
     {
+        // Divide the color by the number of samples.
+        auto scale = art_t::elem_t(1) / samples;
+        auto r = pixel_color.x() * scale;
+        auto g = pixel_color.y() * scale;
+        auto b = pixel_color.z() * scale;
+
         // Write the translated [0,255] value of each color component.
-        auto ir = static_cast<uint8_t>(255.999 * pixel_color.x());
-        auto ig = static_cast<uint8_t>(255.999 * pixel_color.y());
-        auto ib = static_cast<uint8_t>(255.999 * pixel_color.z());
-        data.push_back({ir, ig, ib});
+        auto min = art_t::elem_t(0);
+        auto max = art_t::elem_t(.999);
+        auto ir = static_cast<uint8_t>(256 * std::clamp(r, min, max));
+        auto ig = static_cast<uint8_t>(256 * std::clamp(g, min, max));
+        auto ib = static_cast<uint8_t>(256 * std::clamp(b, min, max));
+        return { ir, ig, ib };
     }
 
     color_t ray_color(ray_t const& r, hittable_list_t const& world)
@@ -54,8 +65,8 @@ namespace
         vec3_t unit_direction = unit_vector(r.direction());
 
         // The color is gradient along the Y-axis
-        auto t = 0.5f * (unit_direction.y() + 1.0f);
-        return (1.0f - t) * g_gradient_start + t * g_gradient_end;
+        auto t = 0.5f * (unit_direction.y() + 1);
+        return (1 - t) * g_gradient_start + t * g_gradient_end;
     }
 }
 
@@ -67,26 +78,19 @@ int main()
     float const aspect_ratio = 16.0f / 9.0f;
     int32_t const image_width = 400;
     int32_t const image_height = static_cast<int32_t>(image_width / aspect_ratio);
+    int32_t const samples_per_pixel = 10; // Antialiasing sampling rate
 
+    //
     // World
+    //
     hittable_list_t world;
-    world.add(std::make_shared<sphere_t>(point3_t{ 0, 0, -1.0f }, 0.5f));
-    world.add(std::make_shared<sphere_t>(point3_t{ 0, -100.5f, -1.0f }, 100.0f));
+    world.add(std::make_shared<sphere_t>(point3_t{ 0, 0, -1 }, 0.5f));
+    world.add(std::make_shared<sphere_t>(point3_t{ 0, -100.5f, -1 }, 100));
 
     //
     // Camera
     //
-    float const viewport_height = 2.0f; // Y-axis
-    float const viewport_width = aspect_ratio * viewport_height; // X-axis
-    float const focal_length = 1.0f; // Z-axis
-
-    point3_t const origin = { 0, 0, 0 };
-    vec3_t const horizontal = { viewport_width, 0, 0 };
-    vec3_t const vertical = { 0, viewport_height, 0 };
-
-    // Represents the lowest left corner of the viewport.
-    // Note this is the focal length away from the origin.
-    vec3_t const lower_left_corner = origin - (horizontal / 2.0f) - (vertical / 2.0f) - vec3_t{ 0, 0, focal_length };
+    camera_t camera{ aspect_ratio };
 
     //
     // Render
@@ -97,17 +101,22 @@ int main()
     {
         for (int32_t i = 0; i < image_width; ++i)
         {
-            auto u = float(i) / (image_width - 1);
-            auto v = float(j) / (image_height - 1);
+            // Using sampling, apply antialiasing to compute the pixel color.
+            color_t pixel_color{};
+            for (int s = 0; s < samples_per_pixel; ++s)
+            {
+                auto u = (i + art_t::rnd_val()) / (image_width - 1);
+                auto v = (j + art_t::rnd_val()) / (image_height - 1);
 
-            // Create a ray from the origin across the viewport
-            ray_t r{ origin, lower_left_corner + u * horizontal + v * vertical - origin };
+                // Create a ray from the camera to a point on the viewport
+                ray_t r = camera.get_ray(u, v);
 
-            // Given the ray compute the color of the pixel the ray intersects
-            color_t pixel_color = ray_color(r, world);
+                // Given the ray compute the color of the pixel the ray intersects
+                pixel_color += ray_color(r, world);
+            }
 
-            // Write the computed color
-            write_pixel(pixel_color, image_data);
+            // Create the pixel
+            image_data.push_back(create_pixel(pixel_color, samples_per_pixel));
         }
     }
 

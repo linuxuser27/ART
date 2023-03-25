@@ -4,26 +4,24 @@
 #include <cmath>
 
 template<typename T>
-class vecT3_t final
+class vec3T_t final
 {
     T _e[3];
 public:
     using elem_t = T;
 
-    vecT3_t() : _e{}
+    vec3T_t() : _e{}
     { }
-    vecT3_t(T x, T y, T z) : _e{ x, y, z }
+    vec3T_t(T x, T y, T z) : _e{ x, y, z }
     { }
 
     T x() const { return _e[0]; }
     T y() const { return _e[1]; }
     T z() const { return _e[2]; }
 
-    vecT3_t operator-() const { return { -_e[0], -_e[1], -_e[2] }; }
-    T operator[](int32_t i) const { return _e[i]; }
-    T& operator[](int32_t i) { return _e[i]; }
+    vec3T_t operator-() const { return { -_e[0], -_e[1], -_e[2] }; }
 
-    vecT3_t& operator+=(vecT3_t const &v)
+    vec3T_t& operator+=(vec3T_t const &v)
     {
         _e[0] += v._e[0];
         _e[1] += v._e[1];
@@ -31,7 +29,7 @@ public:
         return *this;
     }
 
-    vecT3_t& operator*=(T const t)
+    vec3T_t& operator*=(T const t)
     {
         _e[0] *= t;
         _e[1] *= t;
@@ -39,7 +37,7 @@ public:
         return *this;
     }
 
-    vecT3_t& operator/=(T const t)
+    vec3T_t& operator/=(T const t)
     {
         return *this *= 1/t;
     }
@@ -56,49 +54,46 @@ public:
 };
 
 template<typename T>
-using pointT3_t = vecT3_t<T>;
+using point3T_t = vec3T_t<T>;
 
 template<typename T>
-using colorT_t = vecT3_t<T>;
-
-template<typename T>
-vecT3_t<T> operator+(vecT3_t<T> const &u, vecT3_t<T> const &v)
+vec3T_t<T> operator+(vec3T_t<T> const &u, vec3T_t<T> const &v)
 {
     return { u.x() + v.x(), u.y() + v.y(), u.z() + v.z() };
 }
 
 template<typename T>
-vecT3_t<T> operator-(vecT3_t<T> const &u, vecT3_t<T> const &v)
+vec3T_t<T> operator-(vec3T_t<T> const &u, vec3T_t<T> const &v)
 {
     return { u.x() - v.x(), u.y() - v.y(), u.z() - v.z() };
 }
 
 template<typename T>
-vecT3_t<T> operator*(vecT3_t<T> const &u, vecT3_t<T> const &v)
+vec3T_t<T> operator*(vec3T_t<T> const &u, vec3T_t<T> const &v)
 {
     return { u.x() * v.x(), u.y() * v.y(), u.z() * v.z() };
 }
 
 template<typename T>
-vecT3_t<T> operator*(T t, vecT3_t<T> const &v)
+vec3T_t<T> operator*(T t, vec3T_t<T> const &v)
 {
     return { t * v.x(), t * v.y(), t * v.z() };
 }
 
 template<typename T>
-vecT3_t<T> operator*(vecT3_t<T> const &v, T t)
+vec3T_t<T> operator*(vec3T_t<T> const &v, T t)
 {
     return t * v;
 }
 
 template<typename T>
-vecT3_t<T> operator/(vecT3_t<T> v, T t)
+vec3T_t<T> operator/(vec3T_t<T> v, T t)
 {
     return (1 / t) * v;
 }
 
 template<typename T>
-T dot(vecT3_t<T> const &u, vecT3_t<T> const &v)
+T dot(vec3T_t<T> const &u, vec3T_t<T> const &v)
 {
     return u.x() * v.x()
          + u.y() * v.y()
@@ -106,7 +101,7 @@ T dot(vecT3_t<T> const &u, vecT3_t<T> const &v)
 }
 
 template<typename T>
-vecT3_t<T> cross(vecT3_t<T> const &u, vecT3_t<T> const &v)
+vec3T_t<T> cross(vec3T_t<T> const &u, vec3T_t<T> const &v)
 {
     return { u.y() * v.z() - u.z() * v.y(),
              u.z() * v.x() - u.x() * v.z(),
@@ -114,7 +109,7 @@ vecT3_t<T> cross(vecT3_t<T> const &u, vecT3_t<T> const &v)
 }
 
 template<typename T>
-vecT3_t<T> unit_vector(vecT3_t<T> v)
+vec3T_t<T> unit_vector(vec3T_t<T> v)
 {
     return v / v.length();
 }

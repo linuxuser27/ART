@@ -4,9 +4,9 @@ Following https://github.com/RayTracing/raytracing.github.io
 
 ## Requirements (minimum)
 
-- [CMake](https://cmake.org/download/) 3.10
+- [CMake](https://cmake.org/download/) 3.20
 
-- C++14 compliant compiler
+- C++20 compliant compiler
 
 ## Build
 

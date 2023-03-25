@@ -9,14 +9,14 @@
 template<typename T>
 struct hit_resultT_t
 {
-    pointT3_t<T> p;
-    vecT3_t<T> normal;
+    point3T_t<T> p;
+    vec3T_t<T> normal;
     T t;
     bool front_face;
 };
 
 template<typename T>
-void set_face_normal(hit_resultT_t<T>& result, rayT_t<T> const r, vecT3_t<T> const outward_normal)
+void set_face_normal(hit_resultT_t<T>& result, rayT_t<T> const r, vec3T_t<T> const outward_normal)
 {
     result.front_face = dot(r.direction(), outward_normal) < 0;
     result.normal = result.front_face ? outward_normal : -outward_normal;
