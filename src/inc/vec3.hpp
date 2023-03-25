@@ -15,9 +15,6 @@ public:
     vecT3_t(T x, T y, T z) : _e{ x, y, z }
     { }
 
-    vecT3_t(vecT3_t const&) = default;
-    vecT3_t(vecT3_t &&) = default;
-
     T x() const { return _e[0]; }
     T y() const { return _e[1]; }
     T z() const { return _e[2]; }
@@ -57,6 +54,12 @@ public:
         return _e[0]*_e[0] + _e[1]*_e[1] + _e[2]*_e[2];
     }
 };
+
+template<typename T>
+using pointT3_t = vecT3_t<T>;
+
+template<typename T>
+using colorT_t = vecT3_t<T>;
 
 template<typename T>
 vecT3_t<T> operator+(vecT3_t<T> const &u, vecT3_t<T> const &v)
