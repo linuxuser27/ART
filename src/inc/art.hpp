@@ -34,6 +34,12 @@ public:
         static std::mt19937 generator;
         return distribution(generator);
     }
+
+    // Get a random value from [min, max)
+    static T rnd_val(T min, T max)
+    {
+        return min + (max - min) * rnd_val();
+    }
 };
 
 #endif // _SRC_INC_ART_HPP_

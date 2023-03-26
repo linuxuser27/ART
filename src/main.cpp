@@ -33,7 +33,65 @@ namespace
         uint8_t b;
     };
 
-    color_t const g_white{ 1, 1, 1 }; // White
+    vec3_t rnd_vec3(art_t::elem_t min, art_t::elem_t max)
+    {
+        return { art_t::rnd_val(min, max), art_t::rnd_val(min, max), art_t::rnd_val(min, max) };
+    }
+
+    vec3_t random_in_unit_sphere()
+    {
+        while (true)
+        {
+            auto p = rnd_vec3(-1, 1);
+            if (p.length_squared() >= 1)
+                continue;
+            return p;
+        }
+    }
+
+    vec3_t random_unit_vector()
+    {
+        return unit_vector(random_in_unit_sphere());
+    }
+
+    vec3_t random_in_hemisphere(vec3_t const& normal)
+    {
+        vec3_t in_unit_sphere = random_in_unit_sphere();
+        return (dot(in_unit_sphere, normal) > 0) // In the same hemisphere as the normal
+            ? in_unit_sphere
+            : -in_unit_sphere;
+    }
+
+    //
+    // Diffuse formulation options found in
+    // sections 8.1, 8.5 and 8.6
+    //
+    struct diffuse_simple_t final
+    {
+        point3_t operator()(hittable_list_t::hit_result_t const& res) const
+        {
+            return res.p + res.normal + random_in_unit_sphere();
+        }
+    };
+
+    struct diffuse_lambertian_t final
+    {
+        point3_t operator()(hittable_list_t::hit_result_t const& res) const
+        {
+            return res.p + res.normal + random_unit_vector();
+        }
+    };
+
+    struct diffuse_hemisphere_scattering_t final
+    {
+        point3_t operator()(hittable_list_t::hit_result_t const& res) const
+        {
+            return res.p + random_in_hemisphere(res.normal);
+        }
+    };
+
+    color_t const g_black{ 0, 0, 0 }; // RGB:  0,  0,  0
+    color_t const g_white{ 1, 1, 1 }; // RGB:255,255,255
     color_t const g_gradient_start = g_white;
     color_t const g_gradient_end{ 0.5f, 0.7f, 1 }; // Light blue
 
@@ -41,9 +99,11 @@ namespace
     {
         // Divide the color by the number of samples.
         auto scale = art_t::elem_t(1) / samples;
-        auto r = pixel_color.x() * scale;
-        auto g = pixel_color.y() * scale;
-        auto b = pixel_color.z() * scale;
+
+        // Gamma-correct for gamma=2.0 (that is, raise color to power 1/gamma)
+        auto r = std::sqrt(pixel_color.x() * scale);
+        auto g = std::sqrt(pixel_color.y() * scale);
+        auto b = std::sqrt(pixel_color.z() * scale);
 
         // Write the translated [0,255] value of each color component.
         auto min = art_t::elem_t(0);
@@ -54,19 +114,37 @@ namespace
         return { ir, ig, ib };
     }
 
-    color_t ray_color(ray_t const& r, hittable_list_t const& world)
+    template<typename DIFFUSE>
+    color_t ray_color(ray_t r, hittable_list_t const& world, int32_t max_ray_bounce = 50)
     {
-        // Check if an object was hit.
-        hittable_list_t::hit_result_t result;
-        if (world.hit(r, 0, art_t::infinity, result))
-            return 0.5f * (result.normal + g_white);
+        // Accumlation factor for ray bounce.
+        auto acc_factor = art_t::elem_t(1);
 
-        // No objects hit, produce a gradient background
-        vec3_t unit_direction = unit_vector(r.direction());
+        // Instead of recursion, iterate.
+        for (int32_t i = 0; i < max_ray_bounce; ++i)
+        {
+            hittable_list_t::hit_result_t result;
 
-        // The color is gradient along the Y-axis
-        auto t = 0.5f * (unit_direction.y() + 1);
-        return (1 - t) * g_gradient_start + t * g_gradient_end;
+            // Check if an object was hit.
+            // Use 0.001 to address "shadow acne".
+            if (world.hit(r, 0.001, art_t::infinity, result))
+            {
+                point3_t target = DIFFUSE{}(result);
+                r = { result.p, target - result.p };
+                acc_factor *= art_t::elem_t(0.5);
+                continue;
+            }
+
+            // No objects hit, produce a gradient background.
+            vec3_t unit_direction = unit_vector(r.direction());
+
+            // The color is gradient along the Y-axis.
+            auto t = art_t::elem_t(0.5) * (unit_direction.y() + 1);
+            return acc_factor * ((1 - t) * g_gradient_start + t * g_gradient_end);
+        }
+
+        // If we've exceeded the ray bounce limit, no more light is gathered.
+        return g_black;
     }
 }
 
@@ -108,14 +186,14 @@ int main()
                 auto u = (i + art_t::rnd_val()) / (image_width - 1);
                 auto v = (j + art_t::rnd_val()) / (image_height - 1);
 
-                // Create a ray from the camera to a point on the viewport
+                // Create a ray from the camera to a point on the viewport.
                 ray_t r = camera.get_ray(u, v);
 
-                // Given the ray compute the color of the pixel the ray intersects
-                pixel_color += ray_color(r, world);
+                // Given the ray compute the color of the pixel the ray intersects.
+                pixel_color += ray_color<diffuse_hemisphere_scattering_t>(r, world);
             }
 
-            // Create the pixel
+            // Create the pixel.
             image_data.push_back(create_pixel(pixel_color, samples_per_pixel));
         }
     }
