@@ -51,6 +51,15 @@ public:
     {
         return _e[0]*_e[0] + _e[1]*_e[1] + _e[2]*_e[2];
     }
+
+    bool near_zero() const
+    {
+        // Return true if the vector is close to zero in all dimensions.
+        auto const epsilon = T(1e-8);
+        return (std::abs(_e[0]) < epsilon)
+            && (std::abs(_e[1]) < epsilon)
+            && (std::abs(_e[2]) < epsilon);
+    }
 };
 
 template<typename T>

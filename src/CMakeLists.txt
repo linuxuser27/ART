@@ -8,12 +8,13 @@ set(SOURCES
 )
 
 set(HEADERS
-  ./inc/art.hpp
   ./inc/camera.hpp
-  ./inc/hittable.hpp
+  ./inc/elements.hpp
+  ./inc/materials.hpp
   ./inc/ray.hpp
   ./inc/shapes.hpp
   ./inc/vec3.hpp
+  ./inc/utility.hpp
 )
 
 add_executable(gen_ppm
