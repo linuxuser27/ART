@@ -29,6 +29,7 @@ namespace
     using material_t = materialT_t<vec3_t::elem_t>;
     using metal_t = metalT_t<vec3_t::elem_t>;
     using diffuse = diffuseT<vec3_t::elem_t>;
+    using dielectric_t = dielectricT_t<vec3_t::elem_t>;
 
     struct pixel_t final
     {
@@ -41,7 +42,12 @@ namespace
     color_t const g_red{ 255, 0, 0 }; // RGB:255,  0,  0
     color_t const g_white{ 1, 1, 1 }; // RGB:255,255,255
     color_t const g_gradient_start = g_white;
-    color_t const g_gradient_end{ 0.5f, 0.7f, 1 }; // Light blue
+    color_t const g_gradient_end{ 0.5, 0.7, 1 }; // Light blue
+
+    color_t random_color(elem_t min = 0, elem_t max = 1)
+    {
+        return { random_value<elem_t>(min, max), random_value<elem_t>(min, max), random_value<elem_t>(min, max) };
+    }
 
     pixel_t create_pixel(color_t pixel_color, int32_t samples)
     {
@@ -96,6 +102,62 @@ namespace
         // If we've exceeded the ray bounce limit, no more light is gathered.
         return g_black;
     }
+
+    hittable_list_t random_scene()
+    {
+        hittable_list_t world;
+
+        auto ground_material = std::make_shared<diffuse::lambertian_t>(color_t{ 0.5, 0.5, 0.5 });
+        world.add(std::make_shared<sphere_t>(point3_t{ 0, -1000, 0 }, 1000, ground_material));
+
+        // Generate many small spheres
+        for (int32_t a = -11; a < 11; a++)
+        {
+            for (int32_t b = -11; b < 11; b++)
+            {
+                auto choose_mat = random_value<elem_t>();
+                point3_t center(a + 0.9 * random_value<elem_t>(), 0.2, b + 0.9 * random_value<elem_t>());
+
+                if ((center - point3_t{ 4, 0.2, 0 }).length() > 0.9)
+                {
+                    std::shared_ptr<material_t> sphere_material;
+                    if (choose_mat < 0.7)
+                    {
+                        // diffuse
+                        auto albedo = random_color() * random_color();
+                        auto sphere_material = std::make_shared<diffuse::hemisphere_scattering_t>(albedo);
+                        world.add(std::make_shared<sphere_t>(center, 0.2, sphere_material));
+                    }
+                    else if (choose_mat < 0.95)
+                    {
+                        // metal
+                        auto albedo = random_color(0.5, 1);
+                        auto fuzz = random_value<elem_t>(0, 0.5);
+                        sphere_material = std::make_shared<metal_t>(albedo, fuzz);
+                        world.add(std::make_shared<sphere_t>(center, 0.2, sphere_material));
+                    }
+                    else
+                    {
+                        // glass
+                        sphere_material = std::make_shared<dielectric_t>(1.5);
+                        world.add(std::make_shared<sphere_t>(center, 0.2, sphere_material));
+                    }
+                }
+            }
+        }
+
+        // Three large spheres
+        auto material1 = std::make_shared<dielectric_t>(1.5);
+        world.add(std::make_shared<sphere_t>(point3_t{ 0, 1, 0 }, 1, material1));
+
+        auto material2 = std::make_shared<diffuse::lambertian_t>(color_t{ 0.4, 0.2, 0.1 });
+        world.add(std::make_shared<sphere_t>(point3_t{ -4, 1, 0 }, 1, material2));
+
+        auto material3 = std::make_shared<metal_t>(color_t{ 0.7, 0.6, 0.5 }, 0.0);
+        world.add(std::make_shared<sphere_t>(point3_t{ 4, 1, 0 }, 1, material3));
+
+        return world;
+    }
 }
 
 int main()
@@ -103,30 +165,26 @@ int main()
     //
     // Image
     //
-    float const aspect_ratio = 16.0f / 9.0f;
-    int32_t const image_width = 400;
+    elem_t const aspect_ratio = 3.0 / 2.0;
+    int32_t const image_width = 1200;
     int32_t const image_height = static_cast<int32_t>(image_width / aspect_ratio);
     int32_t const samples_per_pixel = 10; // Antialiasing sampling rate
 
     //
     // World
     //
-    hittable_list_t world;
-
-    auto material_ground = std::make_shared<diffuse::lambertian_t>(color_t{ 0.8, 0.8, 0 });
-    auto material_center = std::make_shared<diffuse::lambertian_t>(color_t{ 0.7, 0.3, 0.3 });
-    auto material_left   = std::make_shared<metal_t>(color_t{ 0.8, 0.8, 0.8 }, 0.3);
-    auto material_right  = std::make_shared<metal_t>(color_t{ 0.8, 0.6, 0.2 }, 1.0);
-
-    world.add(std::make_shared<sphere_t>(point3_t{  0, -100.5f, -1 }, 100.0f, material_ground));
-    world.add(std::make_shared<sphere_t>(point3_t{  0,    0.0f, -1 },   0.5f, material_center));
-    world.add(std::make_shared<sphere_t>(point3_t{ -1,    0.0f, -1 },   0.5f, material_left));
-    world.add(std::make_shared<sphere_t>(point3_t{  1,    0.0f, -1 },   0.5f, material_right));
+    hittable_list_t world = random_scene();
 
     //
     // Camera
     //
-    camera_t camera{ aspect_ratio };
+    point3_t lookfrom{ 13, 2, 3 };
+    point3_t lookat{ 0, 0, 0 };
+    vec3_t vup{ 0, 1, 0 };
+    elem_t dist_to_focus = 10.0;
+    elem_t aperture = 0.1;
+
+    camera_t camera{ lookfrom, lookat, vup, 20, aspect_ratio, aperture, dist_to_focus };
 
     //
     // Render

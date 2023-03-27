@@ -1,6 +1,7 @@
 #ifndef _SRC_INC_MATERIALS_HPP_
 #define _SRC_INC_MATERIALS_HPP_
 
+#include <algorithm>
 #include <concepts>
 
 #include "ray.hpp"
@@ -108,14 +109,31 @@ public:
     using hemisphere_scattering_t = diffuse_baseT_t<T, hemisphere_scattering_formula>;
 };
 
+// Reflection - returns the reflected vector
+//  v - vector to reflect
+//  n - normal of point
+template<typename T>
+vec3T_t<T> reflect(vec3T_t<T> const& v, vec3T_t<T> const& n)
+{
+    return v - 2 * dot(v,n) * n;
+}
+
+// Refraction - returns the refracted vector
+//  uv - unit vector to refract
+//  n - normal
+//  etai_over_etat - refraction ratio
+template<typename T>
+    requires std::floating_point<T>
+vec3T_t<T> refract(vec3T_t<T> const& uv, vec3T_t<T> const& n, T etai_over_etat) {
+    T cos_theta = std::fmin(dot(-uv, n), 1);
+    vec3T_t<T> r_out_perp =  etai_over_etat * (uv + cos_theta * n);
+    vec3T_t<T> r_out_parallel = -std::sqrt(std::abs(1 - r_out_perp.length_squared())) * n;
+    return r_out_perp + r_out_parallel;
+}
+
 template<typename T>
 class metalT_t final : public materialT_t<T>
 {
-    static vec3T_t<T> reflect(vec3T_t<T> const& v, vec3T_t<T> const& n)
-    {
-        return v - 2 * dot(v,n) * n;
-    }
-
     vec3T_t<T> _albedo;
     T _fuzz;
 public:
@@ -135,6 +153,49 @@ public:
         result.scattered = { hit.p, reflected };
         result.attenuation = _albedo;
         return (dot(result.scattered.direction(), hit.normal) > 0);
+    }
+};
+
+template<typename T>
+    requires std::floating_point<T>
+class dielectricT_t final : public materialT_t<T>
+{
+    T _ir; // Index of Refraction
+public:
+    using hit_result_t = hit_resultT_t<T>;
+    using scatter_result_t = typename materialT_t<T>::scatter_result_t;
+
+    dielectricT_t(T index_of_refraction)
+        : _ir{ index_of_refraction }
+    { }
+    virtual ~dielectricT_t() = default;
+
+    bool scatter(rayT_t<T> const& ray, hit_result_t const& hit, scatter_result_t& result) const override
+    {
+        result.attenuation = vec3T_t<T>{ 1, 1, 1 };
+        auto refraction_ratio = hit.front_face ? (1 / _ir) : _ir;
+
+        vec3T_t<T> unit_direction = unit_vector(ray.direction());
+        T cos_theta = std::fmin(dot(-unit_direction, hit.normal), 1);
+        T sin_theta = std::sqrt(1 - cos_theta*cos_theta);
+
+        // See section 10.3
+        bool cannot_refract = refraction_ratio * sin_theta > 1.0;
+        vec3T_t<T> direction = cannot_refract || reflectance(cos_theta, refraction_ratio) > random_value<T>()
+            ? reflect(unit_direction, hit.normal)
+            : refract(unit_direction, hit.normal, refraction_ratio);
+
+        result.scattered = { hit.p, direction };
+        return true;
+    }
+
+private: // static
+    static T reflectance(T cosine, T ref_idx)
+    {
+        // Use Schlick's approximation for reflectance.
+        auto r0 = (1 - ref_idx) / (1 + ref_idx);
+        r0 = r0 * r0;
+        return r0 + (1 - r0) * std::pow((1 - cosine), 5);
     }
 };
 

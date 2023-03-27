@@ -10,6 +10,7 @@ Following https://github.com/RayTracing/raytracing.github.io
 
 ## Build
 
-> `cmake -S . -B artifacts`
+Using "Release" by default. Set to "Debug" in order to debug the application.
+> `cmake -S . -B artifacts -DCMAKE_BUILD_TYPE=Release`
 
 > `cmake --build artifacts --target install`
